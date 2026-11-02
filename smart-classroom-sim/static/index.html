@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智慧教室 · 人形具身仿真</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="view"></canvas>
+
+    <aside id="panel">
+      <header>
+        <h1>智慧教室 · 具身仿真</h1>
+        <p class="sub">PyBullet · 双足人形 · 头部相机 · 2D 雷达</p>
+      </header>
+
+      <section class="stats">
+        <div><span>引擎</span><b id="engine">PyBullet</b></div>
+        <div><span>位置</span><b id="pose">-</b></div>
+        <div><span>速度</span><b id="speed">-</b></div>
+        <div><span>路径</span><b id="pathinfo">-</b></div>
+        <div><span>状态</span><b id="runstate">待机</b></div>
+      </section>
+
+      <section class="actions">
+        <button id="btn-plan">规划到目标</button>
+        <button id="btn-start" class="primary">开始导航</button>
+        <button id="btn-stop">停止</button>
+        <button id="btn-reset">重置机器人</button>
+        <button id="btn-obstacle" class="toggle">绘制障碍</button>
+        <button id="btn-clear">清空障碍</button>
+        <label class="check"><input type="checkbox" id="chk-camera" /> 显示相机画面</label>
+      </section>
+
+      <section class="teleop">
+        <p class="label">遥操作</p>
+        <div class="pad">
+          <span></span>
+          <button class="key" data-v="0.4" data-w="0" data-code="KeyW">W</button>
+          <span></span>
+          <button class="key" data-v="0" data-w="0.8" data-code="KeyA">A</button>
+          <button class="key" data-v="-0.4" data-w="0" data-code="KeyS">S</button>
+          <button class="key" data-v="0" data-w="-0.8" data-code="KeyD">D</button>
+        </div>
+      </section>
+
+      <section class="hint">
+        <p>左键点击地面设置目标；勾选“绘制障碍”后拖拽画矩形；WASD 控制双足行走。</p>
+      </section>
+    </aside>
+
+    <div id="camera-panel" class="hidden">
+      <div class="cam-title">
+        <span>头部摄像头画面</span>
+        <button id="btn-cam-close" title="关闭">×</button>
+      </div>
+      <img id="camera-img" alt="机器人相机画面" />
+    </div>
+
+    <div id="toast"></div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

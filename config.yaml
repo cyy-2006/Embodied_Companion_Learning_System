@@ -1,0 +1,20 @@
+port:
+  backend: 3000
+  frontend: 8080
+host:
+  backend: 127.0.0.1
+  frontend: 127.0.0.1
+baidu_map:
+  access_key: <ACCESS_KEY>
+debug: false
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: dsavd
+  password: ''
+  database: dsavd
+integrations:
+  deeptutor:
+    root: D:/bigchuang/DeepTutor-main/DeepTutor-main
+    backend_port: 8001
+    frontend_port: 3782

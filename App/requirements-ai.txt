@@ -1,0 +1,6 @@
+ultralytics>=8.3,<9
+deepface>=0.0.93,<1
+tensorflow-cpu>=2.16,<2.22
+tf-keras>=2.16,<2.22
+faster-whisper>=1.1,<2
+moviepy>=1.0.3,<2

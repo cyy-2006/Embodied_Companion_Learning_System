@@ -1,0 +1,15 @@
+[Unit]
+Description=Smart Classroom PyBullet Simulation
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/dsavd-release/smart-classroom-sim
+ExecStart=/root/.local/share/dsavd-sim-venv/bin/python server.py --host 127.0.0.1 --port 3100
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/dsavd-classroom-sim.log
+StandardError=append:/var/log/dsavd-classroom-sim.log
+
+[Install]
+WantedBy=multi-user.target

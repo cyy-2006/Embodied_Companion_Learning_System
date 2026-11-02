@@ -1,0 +1,17 @@
+[Unit]
+Description=DSAVD Flask backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/dsavd/App
+EnvironmentFile=/etc/dsavd.env
+Environment=PYTHONPATH=/opt/dsavd:/opt/dsavd/App
+ExecStart=/opt/dsavd-venv/bin/gunicorn --bind 127.0.0.1:3000 --workers 1 --threads 4 --timeout 900 --access-logfile - --error-logfile - app:app
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
