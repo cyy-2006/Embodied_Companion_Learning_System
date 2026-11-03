@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from './vendor/jsm/loaders/GLTFLoader.js';
+import { loadURDF } from './urdf-loader.js?v=20261103';
 
 // 独立运行时走 Flask 的相对接口；部署到主站 /smart-classroom-sim/ 时走主服务代理接口
 const IN_SERVER = location.pathname.startsWith('/smart-classroom-sim');
@@ -43,104 +44,33 @@ let info = null;
 let model = null;
 let floorPlane = null;
 let bounds = null;
-let lidarHeight = 0.845;
+let lidarHeight = 1.17;
 
 // ------------------------------------------------------------------ robot
 const robotGroup = new THREE.Group();
 scene.add(robotGroup);
 
 const robotJoints = {};
+let robotReady = false;
 
-function jointGroup(parent, x, y, z) {
-  const group = new THREE.Group();
-  group.position.set(x, y, z);
-  parent.add(group);
-  return group;
+// 加载宇树 G1 官方 URDF（Z-up），旋转后挂到 Y-up 场景里
+async function buildRobot() {
+  const { root, joints } = await loadURDF(`${ASSET_BASE}/g1/g1_29dof.urdf`);
+  root.rotation.x = -Math.PI / 2;
+  robotGroup.add(root);
+  for (const [name, joint] of Object.entries(joints)) robotJoints[name] = joint;
+  robotReady = true;
+  window.__g1Ready = true;
+  console.info(`G1 模型已加载：${Object.keys(robotJoints).length} 个关节`);
 }
-
-// 与 assets/robot.urdf 保持同一尺寸；组原点为骨盆中心
-function buildRobot() {
-  const mat = (color, rough = 0.55) => new THREE.MeshStandardMaterial({
-    color, roughness: rough, metalness: 0.12,
-  });
-  const pelvisMat = mat(0x353945);
-  const torsoMat = mat(0xd7dbe2);
-  const armMat = mat(0x8d939e);
-  const legMat = mat(0x4d5361);
-  const footMat = mat(0x22242b);
-  const skinMat = mat(0xcbb9a8, 0.7);
-
-  const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.18, 0.20), pelvisMat);
-  robotGroup.add(pelvis);
-
-  const torso = jointGroup(robotGroup, 0, 0.09, 0);
-  const torsoMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.46, 0.24), torsoMat);
-  torsoMesh.position.y = 0.23;
-  torso.add(torsoMesh);
-
-  const head = jointGroup(torso, 0, 0.46, 0);
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.10, 24, 18), torsoMat);
-  headMesh.position.y = 0.09;
-  head.add(headMesh);
-  const cameraModule = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.03), mat(0x101216, 0.3));
-  cameraModule.position.set(0.13, 0.09, 0);
-  head.add(cameraModule);
-  const visor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.02, 0.03, 0.11),
-    new THREE.MeshStandardMaterial({ color: 0x1b3a63, roughness: 0.25, metalness: 0.5 })
-  );
-  visor.position.set(0.095, 0.09, 0);
-  head.add(visor);
-
-  const lidar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 20), mat(0xf59e0b, 0.4));
-  lidar.position.set(0, 0.105, 0);
-  robotGroup.add(lidar);
-
-  for (const [side, sx] of [['left', 1], ['right', -1]]) {
-    const shoulder = jointGroup(torso, 0.225 * sx, 0.36, 0);
-    const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.26, 14), armMat);
-    upperArm.position.y = -0.13;
-    shoulder.add(upperArm);
-
-    const elbow = jointGroup(shoulder, 0, -0.26, 0);
-    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.24, 14), armMat);
-    forearm.position.y = -0.12;
-    elbow.add(forearm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 10), skinMat);
-    hand.position.y = -0.24;
-    elbow.add(hand);
-
-    const hip = jointGroup(robotGroup, 0.11 * sx, -0.08, 0);
-    const thigh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.30, 0.14), legMat);
-    thigh.position.y = -0.15;
-    hip.add(thigh);
-
-    const knee = jointGroup(hip, 0, -0.30, 0);
-    const shin = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.30, 0.12), legMat);
-    shin.position.y = -0.15;
-    knee.add(shin);
-
-    const ankle = jointGroup(knee, 0, -0.30, 0);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.11), footMat);
-    foot.position.set(0.05, -0.03, 0);
-    ankle.add(foot);
-
-    robotJoints[`${side}_shoulder_joint`] = shoulder;
-    robotJoints[`${side}_elbow_joint`] = elbow;
-    robotJoints[`${side}_hip_joint`] = hip;
-    robotJoints[`${side}_knee_joint`] = knee;
-    robotJoints[`${side}_ankle_joint`] = ankle;
-  }
-}
-buildRobot();
 robotGroup.visible = false;
 
-// PyBullet 关节绕 Y 轴，对应 Three.js 的 Z 轴（方向取反）
+// 关节绕 URDF 自身轴向旋转，角度直接来自 PyBullet
 function applyJoints(joints) {
   if (!joints) return;
   for (const [name, angle] of Object.entries(joints)) {
-    const group = robotJoints[name];
-    if (group) group.rotation.z = -angle;
+    const joint = robotJoints[name];
+    if (joint) joint.object.quaternion.setFromAxisAngle(joint.axis, angle);
   }
 }
 
@@ -353,7 +283,7 @@ async function pollState() {
     targetPos.set(s.robot.x, s.robot.z, -s.robot.y);
     targetYaw.value = s.robot.yaw;
     applyJoints(s.robot.joints);
-    robotGroup.visible = true;
+    robotGroup.visible = robotReady;
     if (firstState) {
       robotGroup.position.copy(targetPos);
       robotGroup.rotation.y = s.robot.yaw;
@@ -647,6 +577,11 @@ window.addEventListener('resize', () => {
 async function boot() {
   try {
     await loadScene();
+    try {
+      await buildRobot();
+    } catch (error) {
+      toast(`G1 模型加载失败：${error.message}`, 5000);
+    }
     toast('场景已加载：PyBullet 已接管物理仿真');
   } catch (error) {
     toast(`场景加载失败：${error.message}`, 5000);

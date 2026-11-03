@@ -1,0 +1,59 @@
+<mujoco model="smart_classroom_g1">
+  <!-- 宇树 G1 29-DoF 官方模型（MuJoCo Menagerie，BSD-3） -->
+  <include file="g1.xml"/>
+
+  <visual>
+    <headlight diffuse="0.55 0.55 0.55" ambient="0.28 0.30 0.34" specular="0.6 0.6 0.6"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="140" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.28 0.36 0.48" rgb2="0.02 0.03 0.05"
+      width="512" height="3072"/>
+    <!-- meshdir 指向 G1 网格目录，教室网格用相对该目录的路径引用 -->
+    <mesh name="classroom" file="../../../../assets/classroom.obj" smoothnormal="false"/>
+    <texture name="classroom_tex" type="2d" file="material_0.png"/>
+    <material name="classroom_tex_mat" texture="classroom_tex" rgba="1 1 1 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0.5 0 3.6" dir="0 0 -1" directional="true" diffuse="0.6 0.6 0.6"/>
+    <light pos="-3 -4 3" dir="1 1 -1" directional="true" diffuse="0.35 0.35 0.38"/>
+
+    <!-- 教室网格仅用于渲染与射线（不参与接触，机器人基座由控制器驱动） -->
+    <geom name="classroom_geom" type="mesh" mesh="classroom" material="classroom_tex_mat"
+      contype="0" conaffinity="0" group="1"/>
+    <!-- 支撑地面：机器人足底与之接触，教室网格本身不参与接触 -->
+    <geom name="floor" type="plane" size="0 0 0.05" pos="0 0 -0.003"
+      rgba="0.12 0.14 0.18 1" contype="1" conaffinity="1" group="1"/>
+
+    <!-- 障碍物池：运行时通过修改 geom_pos/geom_size 复用这些盒体（初始藏在地面以下） -->
+    <body name="obstacle_pool" pos="0 0 0">
+      <geom name="obstacle_0" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_1" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_2" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_3" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_4" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_5" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_6" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_7" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_8" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_9" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_10" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_11" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_12" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_13" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_14" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_15" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_16" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_17" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_18" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_19" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_20" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_21" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_22" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+      <geom name="obstacle_23" type="box" size="0.1 0.1 0.1" pos="0 0 -50" rgba="0.95 0.55 0.12 0.7" contype="0" conaffinity="0" group="1"/>
+    </body>
+  </worldbody>
+</mujoco>

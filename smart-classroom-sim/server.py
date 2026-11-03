@@ -1,20 +1,27 @@
-"""智慧教室 PyBullet 仿真服务。
+"""智慧教室仿真服务（默认 MuJoCo，可用 SIM_ENGINE=pybullet 回退）。
 
 启动：
-    /root/.local/share/dsavd-sim-venv/bin/python server.py --host 127.0.0.1 --port 3100
+    /root/.local/share/dsavd-mujoco-venv/bin/python server.py --host 127.0.0.1 --port 3100
 """
 import argparse
 import os
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+os.environ.setdefault("MUJOCO_GL", "osmesa")
 
-from sim.world import ClassroomSim
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
+SIM_ENGINE = os.environ.get("SIM_ENGINE", "mujoco").strip().lower()
+if SIM_ENGINE == "pybullet":
+    from sim.world import ClassroomSim as SimClass
+else:
+    SIM_ENGINE = "mujoco"
+    from sim.mjworld import MjClassroomSim as SimClass
+
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
-sim = ClassroomSim(BASE_DIR)
+sim = SimClass(BASE_DIR)
 
 
 @app.after_request
@@ -34,7 +41,7 @@ def index():
 
 @app.get("/api/sim/health")
 def health():
-    return jsonify({"ok": True, "engine": "PyBullet"})
+    return jsonify({"ok": True, "engine": SIM_ENGINE})
 
 
 @app.get("/api/sim/info")

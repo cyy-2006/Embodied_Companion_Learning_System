@@ -21,6 +21,17 @@ from . import config
 from .planner import GridMap, wrap_angle
 
 
+# 宇树 G1 官方 stand 关键帧：双臂微屈、双腿伸直
+STAND_POSE = {
+    "left_shoulder_pitch_joint": 0.20,
+    "right_shoulder_pitch_joint": 0.20,
+    "left_shoulder_roll_joint": 0.20,
+    "right_shoulder_roll_joint": -0.20,
+    "left_elbow_joint": 1.28,
+    "right_elbow_joint": 1.28,
+}
+
+
 class ClassroomSim:
     def __init__(self, base_dir):
         self.base_dir = os.path.abspath(base_dir)
@@ -184,7 +195,9 @@ class ClassroomSim:
         return self.grid.cell_to_world(*free)
 
     def _spawn_robot(self):
-        urdf = os.path.join(self.assets_dir, "robot.urdf")
+        urdf = os.path.join(
+            self.base_dir, "static", "assets", "g1", "g1_29dof.urdf"
+        )
         x, y, z = self.spawn
         self.robot_id = p.loadURDF(
             urdf,
@@ -195,9 +208,11 @@ class ClassroomSim:
             physicsClientId=self.client,
         )
         self.joints = {}
+        self._link_ids = {}
         for j in range(p.getNumJoints(self.robot_id, physicsClientId=self.client)):
             info = p.getJointInfo(self.robot_id, j, physicsClientId=self.client)
             name = info[1].decode("utf-8")
+            self._link_ids[info[12].decode("utf-8")] = j
             if info[2] != p.JOINT_REVOLUTE:
                 continue
             self.joints[name] = j
@@ -215,11 +230,29 @@ class ClassroomSim:
             physicsClientId=self.client,
         )
         self._target_pose = (x, y, 0.0)
-        self._apply_gait_targets()
+        self._apply_stand_pose()
         p.resetBaseVelocity(
             self.robot_id, [0, 0, 0], [0, 0, 0], physicsClientId=self.client
         )
         self._update_lidar()
+
+    def _apply_stand_pose(self):
+        for name, joint in self.joints.items():
+            p.setJointMotorControl2(
+                self.robot_id, joint, p.POSITION_CONTROL,
+                targetPosition=STAND_POSE.get(name, 0.0),
+                force=self._joint_force(name), positionGain=0.55,
+                velocityGain=0.45, physicsClientId=self.client,
+            )
+
+    def _link_position(self, name):
+        index = getattr(self, "_link_ids", {}).get(name)
+        if index is None:
+            return None
+        return p.getLinkState(
+            self.robot_id, index, computeForwardKinematics=1,
+            physicsClientId=self.client,
+        )[0]
 
     @staticmethod
     def _joint_force(name):
@@ -229,6 +262,10 @@ class ClassroomSim:
             return 45.0
         if "ankle" in name:
             return 30.0
+        if "waist" in name:
+            return 25.0
+        if "elbow" in name:
+            return 20.0
         if "shoulder" in name:
             return 12.0
         return 10.0
@@ -244,16 +281,18 @@ class ClassroomSim:
     def _update_lidar(self):
         pos, _, euler = self._base_pose()
         yaw = euler[2]
+        link = self._link_position(config.LIDAR_LINK)
+        scan_z = link[2] if link else config.LIDAR_Z
         angles = np.linspace(-math.pi, math.pi, config.LIDAR_RAYS)
         starts = []
         ends = []
         for angle in angles:
             a = yaw + angle
-            starts.append([pos[0], pos[1], config.LIDAR_Z])
+            starts.append([pos[0], pos[1], scan_z])
             ends.append([
                 pos[0] + config.LIDAR_RANGE * math.cos(a),
                 pos[1] + config.LIDAR_RANGE * math.sin(a),
-                config.LIDAR_Z,
+                scan_z,
             ])
         hits = p.rayTestBatch(
             starts, ends, numThreads=2, physicsClientId=self.client
@@ -281,13 +320,12 @@ class ClassroomSim:
             pos, _, euler = self._base_pose()
             yaw = euler[2]
             fx, fy = math.cos(yaw), math.sin(yaw)
-            # 头部相机：位于头前方，带固定下俯角
-            ox, oy, oz = config.HEAD_CAMERA_OFFSET
-            eye = [
-                pos[0] + ox * fx - oy * fy,
-                pos[1] + ox * fy + oy * fx,
-                pos[2] + oz,
-            ]
+            # 头部 RealSense D435：直接取 URDF 中 d435_link 的世界位姿
+            link = self._link_position(config.CAMERA_LINK)
+            if link:
+                eye = [link[0], link[1], link[2]]
+            else:
+                eye = [pos[0], pos[1], pos[2] + 1.25]
             cos_p = math.cos(config.CAMERA_PITCH)
             sin_p = math.sin(config.CAMERA_PITCH)
             target = [
@@ -355,13 +393,14 @@ class ClassroomSim:
             s = math.sin(self.gait_phase + offset)
             hip = config.STEP_HIP * s * amp
             knee = config.STEP_KNEE * max(0.0, math.sin(self.gait_phase + offset + 0.6)) * amp
-            ankle = -(hip + knee) * 0.8
+            ankle = -(hip + knee) * 0.75
+            ankle = max(-0.80, min(0.45, ankle))
             targets = {
-                f"{side}_hip_joint": hip,
+                f"{side}_hip_pitch_joint": hip,
                 f"{side}_knee_joint": knee,
-                f"{side}_ankle_joint": ankle,
-                f"{side}_shoulder_joint": -config.STEP_ARM * s * amp,
-                f"{side}_elbow_joint": -0.18 - 0.12 * max(0.0, s) * amp,
+                f"{side}_ankle_pitch_joint": ankle,
+                f"{side}_shoulder_pitch_joint": 0.20 - config.STEP_ARM * s * amp,
+                f"{side}_elbow_joint": 1.28 - 0.10 * max(0.0, s) * amp,
             }
             for name, angle in targets.items():
                 joint = self.joints.get(name)
@@ -473,15 +512,19 @@ class ClassroomSim:
             return state
 
     def info(self):
+        lidar = self._link_position(config.LIDAR_LINK)
+        camera = self._link_position(config.CAMERA_LINK)
         return {
             "ok": True,
             "engine": "PyBullet",
             "physics_hz": config.PHYSICS_HZ,
             "control_hz": config.CONTROL_HZ,
             "robot": {
-                "type": "humanoid_biped",
+                "type": "unitree_g1_29dof",
+                "model": "Unitree G1 (29-DoF)",
                 "radius": config.ROBOT_RADIUS,
-                "height": 1.48,
+                "height": 1.32,
+                "dof": len(self.joints),
                 "gait": {
                     "stride": config.STEP_STRIDE,
                     "max_speed": config.MAX_LINEAR_SPEED,
@@ -492,14 +535,15 @@ class ClassroomSim:
                 "lidar": {
                     "rays": config.LIDAR_RAYS,
                     "range": config.LIDAR_RANGE,
-                    "z": config.LIDAR_Z,
+                    "z": round(lidar[2], 3) if lidar else config.LIDAR_Z,
+                    "link": config.LIDAR_LINK,
                 },
                 "camera": {
                     "width": config.CAMERA_WIDTH,
                     "height": config.CAMERA_HEIGHT,
                     "fps": config.CAMERA_MAX_HZ,
-                    "mount": "head",
-                    "offset": list(config.HEAD_CAMERA_OFFSET),
+                    "mount": config.CAMERA_LINK,
+                    "height": round(camera[2], 3) if camera else None,
                     "pitch": config.CAMERA_PITCH,
                 },
             },
@@ -597,7 +641,7 @@ class ClassroomSim:
                 self.robot_id, [0, 0, 0], [0, 0, 0],
                 physicsClientId=self.client,
             )
-            self._apply_gait_targets()
+            self._apply_stand_pose()
             self._update_lidar()
             self._update_state()
         return True
